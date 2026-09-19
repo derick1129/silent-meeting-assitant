@@ -7,6 +7,9 @@ from backend.models.commands import COMMAND_REGISTRY
 from backend.models.events import WebSocketEnvelope, ModalitySource
 from backend.orchestrator import AssistantOrchestrator
 
+from backend.audio.stt import BaseSTTProvider, DeepgramSTTProvider, STTTranscriptEvent
+import base64
+
 class ConnectionManager:
     def __init__(self):
         self.active_connections: Set[WebSocket] = set()
@@ -28,7 +31,10 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-def create_app(orchestrator: Optional[AssistantOrchestrator] = None) -> FastAPI:
+def create_app(
+    orchestrator: Optional[AssistantOrchestrator] = None,
+    stt_provider: Optional[BaseSTTProvider] = None
+) -> FastAPI:
     settings = get_settings()
     app = FastAPI(title="Silent Meeting Assistant API", version="0.1.0")
 
@@ -57,6 +63,20 @@ def create_app(orchestrator: Optional[AssistantOrchestrator] = None) -> FastAPI:
     if orchestrator:
         orchestrator.on_broadcast = broadcast_sync
 
+    def handle_transcript(evt: STTTranscriptEvent):
+        if evt.text.strip():
+            active_orchestrator.set_meeting_context(evt.text.strip())
+            broadcast_sync("context_updated", {
+                "status": "ok",
+                "snippet": evt.text.strip(),
+                "is_final": evt.is_final
+            })
+
+    active_stt = stt_provider or DeepgramSTTProvider(
+        api_key=settings.deepgram_api_key,
+        on_transcript=handle_transcript
+    )
+
     @app.get("/health")
     def health():
         return {"status": "ok", "mode": settings.dev_mode}
@@ -70,6 +90,7 @@ def create_app(orchestrator: Optional[AssistantOrchestrator] = None) -> FastAPI:
         nonlocal loop
         loop = asyncio.get_running_loop()
         await manager.connect(websocket)
+        await active_stt.start()
         try:
             await websocket.send_json(
                 WebSocketEnvelope(event="system_status", data={"status": "connected", "mode": settings.dev_mode}).model_dump()
@@ -80,6 +101,15 @@ def create_app(orchestrator: Optional[AssistantOrchestrator] = None) -> FastAPI:
 
                 if action == "ping":
                     await websocket.send_json({"event": "pong"})
+
+                elif action == "audio_chunk":
+                    chunk_b64 = data.get("data", "")
+                    if chunk_b64:
+                        try:
+                            raw_pcm = base64.b64decode(chunk_b64)
+                            await active_stt.process_audio_chunk(raw_pcm)
+                        except Exception:
+                            pass
 
                 elif action == "simulate_intent":
                     intent = data.get("intent", "QUESTION")
