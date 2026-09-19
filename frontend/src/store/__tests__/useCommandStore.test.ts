@@ -17,8 +17,8 @@ const localStorageMock = (() => {
   };
 })();
 
-Object.defineProperty(global, 'localStorage', { value: localStorageMock, writable: true });
-Object.defineProperty(global, 'window', { value: { localStorage: localStorageMock }, writable: true });
+Object.defineProperty(globalThis, 'localStorage', { value: localStorageMock, writable: true });
+Object.defineProperty(globalThis, 'window', { value: { localStorage: localStorageMock }, writable: true });
 
 describe('useCommandStore', () => {
   beforeEach(() => {
@@ -41,7 +41,7 @@ describe('useCommandStore', () => {
 
   it('updates command text and reflects in getCommandText', async () => {
     // mock global fetch
-    global.fetch = vi.fn().mockResolvedValue({
+    (globalThis as any).fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ status: 'ok' }),
     });
@@ -59,7 +59,7 @@ describe('useCommandStore', () => {
   });
 
   it('allows adding a new custom command', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
+    (globalThis as any).fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ status: 'ok' }),
     });
@@ -74,7 +74,7 @@ describe('useCommandStore', () => {
   });
 
   it('resets commands to default', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
+    (globalThis as any).fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ status: 'ok' }),
     });
