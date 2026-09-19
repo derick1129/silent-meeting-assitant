@@ -23,9 +23,28 @@ class ContextLLMEngine:
         cmd = get_command_by_intent(event.intent)
         base_text = cmd.default_text if cmd else event.raw_text
 
-        # If LLM API key exists, call external client with prompt guardrails
+        # If LLM API key exists, call Gemini client with prompt guardrails
         if self.api_key:
-            return base_text
+            try:
+                from google import genai
+                client = genai.Client(api_key=self.api_key)
+                summary = self.get_context_summary()
+                prompt = (
+                    "You are an AI companion assisting a user in a professional online meeting.\n"
+                    f"Recent meeting discussion: {summary if summary else 'General team sync'}\n"
+                    f"Recognized user command: {event.intent} (Standard phrase: '{base_text}')\n"
+                    "Convert this into a single, polite, professional, contextual meeting-ready message.\n"
+                    "Rules: Output ONLY the message text without quotes or explanations. Never invent new factual information."
+                )
+                response = client.models.generate_content(
+                    model="gemini-3.6-flash",
+                    contents=prompt,
+                )
+                if response and response.text:
+                    return response.text.strip().strip('"')
+            except Exception:
+                # Fallback to rule-based template on network/API failure
+                pass
 
         # High-quality deterministic templates
         summary = self.get_context_summary()
