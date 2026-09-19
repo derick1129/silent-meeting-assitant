@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     host: str = "127.0.0.1"
     port: int = 8000
-    vsr_enabled: bool = False
+    vsr_enabled: bool = True
     vsr_model_id: str = "MahmoodAnaam/MSP-VSR"
     vsr_model_revision: str = "main"
     vsr_device: str = "cpu"

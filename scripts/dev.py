@@ -17,6 +17,7 @@ def run_dev():
     print(f"• WebSocket Stream  : ws://{settings.host}:{settings.port}/ws/events")
     print(f"• Gemini Active     : {bool(settings.gemini_api_key)}")
     print(f"• Deepgram Active   : {bool(settings.deepgram_api_key)}")
+    print(f"• VSR Pipeline      : {'Enabled (' + settings.vsr_model_id + ' on ' + settings.vsr_device + ')' if settings.vsr_enabled else 'Disabled'}")
     print("=" * 65)
     print("👉 Frontend: in another terminal, run: cd frontend && npm run dev")
     print("=" * 65)

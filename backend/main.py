@@ -6,4 +6,4 @@ app = create_app()
 
 if __name__ == "__main__":
     settings = get_settings()
-    uvicorn.run("backend.main:app", host=settings.host, port=settings.port, reload=True)
+    uvicorn.run("backend.main:app", host=settings.host, port=settings.port, reload=True, reload_dirs=["backend"])
