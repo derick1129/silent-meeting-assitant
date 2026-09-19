@@ -72,11 +72,17 @@ def create_app(
     def handle_transcript(evt: STTTranscriptEvent):
         text = evt.text.strip()
         if text:
-            active_orchestrator.set_meeting_context(text)
+            if evt.is_final:
+                active_orchestrator.set_meeting_context(text)
+                full_ctx = active_orchestrator.llm.get_context_summary()
+            else:
+                existing = active_orchestrator.llm.get_context_summary()
+                full_ctx = f"{existing} {text}".strip() if existing else text
+
             broadcast_sync("context_updated", {
                 "status": "ok",
                 "snippet": text,
-                "full_context": active_orchestrator.llm.get_context_summary(),
+                "full_context": full_ctx,
                 "is_final": evt.is_final
             })
             if auto_suggest_enabled and evt.is_final:
