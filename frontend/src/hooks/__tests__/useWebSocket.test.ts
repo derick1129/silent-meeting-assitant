@@ -1,5 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { useAssistantStore } from '../../store/useAssistantStore';
 
 describe('useWebSocket message handling', () => {

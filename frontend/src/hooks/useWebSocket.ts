@@ -11,7 +11,7 @@ interface WebSocketMessage {
 export function useWebSocket(url: string = 'ws://127.0.0.1:8000/ws/events') {
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const socketRef = useRef<WebSocket | null>(null);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const reconnectTimeoutRef = useRef<number | null>(null);
   const { stageEvent } = useAssistantStore();
 
   const connect = useCallback(() => {
