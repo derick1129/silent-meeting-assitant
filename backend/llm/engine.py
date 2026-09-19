@@ -23,7 +23,7 @@ class ContextLLMEngine:
         cmd = get_command_by_intent(event.intent)
         base_text = cmd.default_text if cmd else event.raw_text
 
-        # If LLM API key exists, call Gemini client with prompt guardrails
+        # If LLM API key exists, call Gemini client with prompt guardrails and fast fallback
         if self.api_key:
             try:
                 from google import genai
@@ -36,12 +36,17 @@ class ContextLLMEngine:
                     "Convert this into a single, polite, professional, contextual meeting-ready message.\n"
                     "Rules: Output ONLY the message text without quotes or explanations. Never invent new factual information."
                 )
-                response = client.models.generate_content(
-                    model="gemini-3.6-flash",
-                    contents=prompt,
-                )
-                if response and response.text:
-                    return response.text.strip().strip('"')
+                models_to_try = ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.6-flash"]
+                for model_name in models_to_try:
+                    try:
+                        response = client.models.generate_content(
+                            model=model_name,
+                            contents=prompt,
+                        )
+                        if response and response.text:
+                            return response.text.strip().strip('"')
+                    except Exception:
+                        continue
             except Exception:
                 # Fallback to rule-based template on network/API failure
                 pass
