@@ -2,6 +2,7 @@ import React from 'react';
 import { Header } from './components/Header';
 import { DetectionCard } from './components/DetectionCard';
 import { ContextDrawer } from './components/ContextDrawer';
+import { CameraFeed } from './components/CameraFeed';
 import { SimulationBar } from './components/SimulationBar';
 import { useAssistantStore } from './store/useAssistantStore';
 import { useWebSocket } from './hooks/useWebSocket';
@@ -9,13 +10,15 @@ import { ShieldCheck } from 'lucide-react';
 
 export const App: React.FC = () => {
   const { history } = useAssistantStore();
-  const { isConnected, simulateIntent, updateContext } = useWebSocket();
+  const { isConnected, simulateIntent, updateContext, detectGesture } = useWebSocket();
 
   return (
     <div className="w-[390px] min-h-[540px] max-h-[90vh] bg-gray-950 text-gray-200 flex flex-col font-sans border border-gray-800 shadow-2xl rounded-2xl overflow-hidden">
       <Header />
       
       <div className="p-4 space-y-3.5 flex-1 overflow-y-auto">
+        <CameraFeed onGestureDetected={(_intent, landmarks) => detectGesture(landmarks)} />
+
         <ContextDrawer onUpdateContext={updateContext} isConnected={isConnected} />
         
         <DetectionCard />
