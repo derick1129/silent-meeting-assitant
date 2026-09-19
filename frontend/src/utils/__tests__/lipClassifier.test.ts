@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   calculateLAR,
   LipKinematicsTracker,
-  classifyLipMotion,
   LandmarkPoint,
 } from '../lipClassifier';
 
