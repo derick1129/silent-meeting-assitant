@@ -3,18 +3,27 @@ import sys
 import os
 
 def run_dev():
-    print("=" * 60)
-    print("Silent Meeting Assistant — Development Environment")
-    print("=" * 60)
-    print("Mode: MOCK (Local offline development)")
-    print("Starting backend server at http://127.0.0.1:8000...")
-    print("WebSocket stream available at ws://127.0.0.1:8000/ws/events")
-    print("To launch frontend: cd frontend && npm run dev")
-    print("=" * 60)
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    sys.path.insert(0, project_root)
+    
+    from backend.config import get_settings
+    settings = get_settings()
+
+    print("=" * 65)
+    print(" 🚀 SILENT MEETING ASSISTANT — BACKEND SERVER")
+    print("=" * 65)
+    print(f"• Active Mode       : {settings.dev_mode}")
+    print(f"• Server URL        : http://{settings.host}:{settings.port}")
+    print(f"• WebSocket Stream  : ws://{settings.host}:{settings.port}/ws/events")
+    print(f"• Gemini Active     : {bool(settings.gemini_api_key)}")
+    print(f"• Deepgram Active   : {bool(settings.deepgram_api_key)}")
+    print("=" * 65)
+    print("👉 Frontend: in another terminal, run: cd frontend && npm run dev")
+    print("=" * 65)
     
     env = os.environ.copy()
-    env["DEV_MODE"] = "mock"
-    proc = subprocess.Popen([sys.executable, "-m", "backend.main"], env=env)
+    env["PYTHONPATH"] = project_root
+    proc = subprocess.Popen([sys.executable, "-m", "backend.main"], env=env, cwd=project_root)
     try:
         proc.wait()
     except KeyboardInterrupt:
