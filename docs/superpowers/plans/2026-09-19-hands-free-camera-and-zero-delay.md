@@ -19,11 +19,11 @@
 **Interfaces:**
 - Produces: Immediate `message_staged` broadcast followed by asynchronous `message_refined` broadcast.
 
-- [ ] **Step 1: Write the failing test**
-- [ ] **Step 2: Run test to verify it fails**
-- [ ] **Step 3: Update `backend/orchestrator.py`**
-- [ ] **Step 4: Run test to verify it passes**
-- [ ] **Step 5: Commit**
+- [x] **Step 1: Write the failing test**
+- [x] **Step 2: Run test to verify it fails**
+- [x] **Step 3: Update `backend/orchestrator.py`**
+- [x] **Step 4: Run test to verify it passes**
+- [x] **Step 5: Commit**
 
 ---
 
@@ -38,11 +38,11 @@
 **Interfaces:**
 - Produces: In-browser 0ms geometric gesture classification + `refineStagedMessage(text)` in Zustand store.
 
-- [ ] **Step 1: Write the failing test**
-- [ ] **Step 2: Run test to verify it fails**
-- [ ] **Step 3: Implement `gestureClassifier.ts` and store update**
-- [ ] **Step 4: Run test to verify it passes**
-- [ ] **Step 5: Commit**
+- [x] **Step 1: Write the failing test**
+- [x] **Step 2: Run test to verify it fails**
+- [x] **Step 3: Implement `gestureClassifier.ts` and store update**
+- [x] **Step 4: Run test to verify it passes**
+- [x] **Step 5: Commit**
 
 ---
 
@@ -57,8 +57,8 @@
 **Interfaces:**
 - Produces: `<CameraFeed />` with WebRTC video element, MediaPipe Hands tracking loop, landmark overlay canvas, and camera toggle.
 
-- [ ] **Step 1: Write the failing test**
-- [ ] **Step 2: Run test to verify it fails**
-- [ ] **Step 3: Implement `CameraFeed.tsx` and UI integration**
-- [ ] **Step 4: Run test to verify it passes**
-- [ ] **Step 5: Commit**
+- [x] **Step 1: Write the failing test**
+- [x] **Step 2: Run test to verify it fails**
+- [x] **Step 3: Implement `CameraFeed.tsx` and UI integration**
+- [x] **Step 4: Run test to verify it passes**
+- [x] **Step 5: Commit**
