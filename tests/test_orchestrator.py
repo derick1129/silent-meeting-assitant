@@ -40,3 +40,29 @@ def test_orchestrator_hand_landmarks():
     staged = orchestrator.process_hand_landmarks(fake_landmarks)
     assert staged is not None
     assert "STOP" in [d[1]["intent"] for d in dispatched]
+
+def test_orchestrator_two_phase_staging():
+    import time
+    dispatched = []
+    orchestrator = AssistantOrchestrator(
+        on_broadcast=lambda event, data: dispatched.append((event, data)),
+        llm_engine=ContextLLMEngine(api_key="")
+    )
+    orchestrator.set_meeting_context("Discussion on microservices.")
+    
+    staged = orchestrator.process_intent(
+        source=ModalitySource.LIP,
+        intent="QUESTION",
+        confidence=0.95
+    )
+    assert staged is not None
+    # Immediate broadcast
+    assert len(dispatched) >= 1
+    assert dispatched[0][0] == "message_staged"
+    assert dispatched[0][1]["is_refined"] is False
+    
+    # Wait brief moment for background refinement thread
+    time.sleep(0.1)
+    event_names = [d[0] for d in dispatched]
+    assert "message_refined" in event_names
+

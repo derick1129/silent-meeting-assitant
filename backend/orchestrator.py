@@ -1,3 +1,4 @@
+import threading
 from typing import Callable, Optional, Dict, Any, List
 from backend.config import get_settings
 from backend.models.events import CommunicationEvent, ModalitySource
@@ -35,15 +36,30 @@ class AssistantOrchestrator:
         if not event:
             return None
 
-        normalized_message = self.llm.normalize_intent(event)
-
+        # PHASE 1: Immediate zero-latency broadcast with base text
+        base_text = event.raw_text
         if self.on_broadcast:
             self.on_broadcast("message_staged", {
                 "event": event.model_dump(),
-                "normalized_text": normalized_message,
+                "normalized_text": base_text,
                 "source": source.value,
                 "intent": intent,
-                "confidence": confidence
+                "confidence": confidence,
+                "is_refined": False
             })
 
-        return normalized_message
+        # PHASE 2: Background Gemini LLM refinement
+        def _refine():
+            try:
+                refined_text = self.llm.normalize_intent(event)
+                if refined_text and refined_text != base_text and self.on_broadcast:
+                    self.on_broadcast("message_refined", {
+                        "event_id": event.id,
+                        "refined_text": refined_text
+                    })
+            except Exception:
+                pass
+
+        threading.Thread(target=_refine, daemon=True).start()
+
+        return base_text
