@@ -5,6 +5,10 @@ from backend.models.events import CommunicationEvent, ModalitySource
 from backend.fusion.engine import InputFusionEngine
 from backend.llm.engine import ContextLLMEngine
 from backend.vision.gesture import classify_hand_gesture
+from backend.vision.lips import extract_lip_features, LipSequenceBuffer
+from backend.ml.lip_model import LipGRUModel, VOCABULARY_CLASSES, predict_lip_intent
+import os
+import torch
 
 class AssistantOrchestrator:
     def __init__(
@@ -21,8 +25,30 @@ class AssistantOrchestrator:
         )
         self.llm = llm_engine or ContextLLMEngine(api_key=settings.gemini_api_key)
 
+        self.lip_buffer = LipSequenceBuffer(window_size=24, feature_dim=80)
+        self.lip_model = LipGRUModel()
+        try:
+            ckpt_path = os.path.join(os.path.dirname(__file__), "ml", "checkpoints", "baseline_lip_gru.pth")
+            if os.path.exists(ckpt_path):
+                ckpt = torch.load(ckpt_path, weights_only=False)
+                self.lip_model.load_state_dict(ckpt["model_state_dict"])
+        except Exception:
+            pass
+        self.lip_model.eval()
+
     def set_meeting_context(self, snippet: str) -> None:
         self.llm.add_meeting_context(snippet)
+
+    def process_lip_landmarks(self, landmarks: List[Dict[str, float]]) -> Optional[str]:
+        features = extract_lip_features(landmarks)
+        if features is None:
+            return None
+        self.lip_buffer.push(features)
+        if self.lip_buffer.is_full():
+            intent, confidence = predict_lip_intent(self.lip_model, self.lip_buffer.get_sequence(), VOCABULARY_CLASSES)
+            if confidence >= self.settings.confidence_threshold:
+                return self.process_intent(ModalitySource.LIP, intent, confidence)
+        return None
 
     def process_hand_landmarks(self, landmarks: List[Dict[str, float]]) -> Optional[str]:
         result = classify_hand_gesture(landmarks)

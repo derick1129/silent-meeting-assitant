@@ -122,6 +122,10 @@ def create_app(
                     landmarks = data.get("landmarks", [])
                     active_orchestrator.process_hand_landmarks(landmarks)
 
+                elif action == "detect_lip":
+                    landmarks = data.get("landmarks", [])
+                    active_orchestrator.process_lip_landmarks(landmarks)
+
                 elif action == "update_context":
                     snippet = data.get("snippet", "")
                     active_orchestrator.set_meeting_context(snippet)

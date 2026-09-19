@@ -66,3 +66,21 @@ def test_orchestrator_two_phase_staging():
     event_names = [d[0] for d in dispatched]
     assert "message_refined" in event_names
 
+def test_orchestrator_lip_landmarks():
+    dispatched = []
+    orchestrator = AssistantOrchestrator(
+        on_broadcast=lambda event, data: dispatched.append((event, data)),
+        llm_engine=ContextLLMEngine(api_key="")
+    )
+    # 468 fake face landmarks
+    fake_face = [{"x": 0.5, "y": 0.5, "z": 0.0} for _ in range(468)]
+    fake_face[61] = {"x": 0.4, "y": 0.65, "z": 0.0}
+    fake_face[291] = {"x": 0.6, "y": 0.65, "z": 0.0}
+
+    # Push 24 frames
+    for _ in range(24):
+        orchestrator.process_lip_landmarks(fake_face)
+
+    assert orchestrator.lip_buffer.is_full() is True
+
+
