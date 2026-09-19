@@ -72,14 +72,14 @@ flowchart TD
     Mic --> PCM_Conv
     PCM_Conv --> WS_Audio
     WS_Audio --> Deepgram
-    Deepgram -->|Transcribed Text in ~250ms| Context_Buffer
+    Deepgram -->|"Transcribed Text in ~250ms"| Context_Buffer
 
     %% Video / Gesture Flow
     Webcam --> WASM_Hands
     WASM_Hands --> Gesture_Class
     Gesture_Class --> Canvas_HUD
-    Gesture_Class -->|Intent + Cooldown Check| Cmd_Store
-    Cmd_Store -->|Customized Phrase| Local_Staging
+    Gesture_Class -->|"Intent + Cooldown Check"| Cmd_Store
+    Cmd_Store -->|"Customized Phrase"| Local_Staging
     Gesture_Class --> WS_Gesture
 
     %% Video / Lip Flow
@@ -87,15 +87,15 @@ flowchart TD
     WASM_Face --> Lip_Extractor
     Lip_Extractor --> Lip_Kinematics
     Lip_Kinematics --> Canvas_HUD
-    Lip_Kinematics -->|Intent Triggered| Cmd_Store
+    Lip_Kinematics -->|"Intent Triggered"| Cmd_Store
     Lip_Kinematics --> WS_Lip
 
     %% Backend Fusion & Contextualization
     WS_Gesture --> Fusion_Engine
     WS_Lip --> Fusion_Engine
     Fusion_Engine --> Gemini_LLM
-    Context_Buffer -->|Recent Discussion Context| Gemini_LLM
-    Gemini_LLM -->|Refined Phrase (~1.1s)| WS_Out
+    Context_Buffer -->|"Recent Discussion Context"| Gemini_LLM
+    Gemini_LLM -->|"Refined Phrase (~1.1s)"| WS_Out
     WS_Out --> Staged_UI
     Local_Staging --> Staged_UI
     Staged_UI --> Clipboard
