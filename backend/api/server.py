@@ -1,9 +1,11 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from typing import List, Set
+from typing import List, Set, Optional, Dict, Any
+import asyncio
 from backend.config import get_settings
 from backend.models.commands import COMMAND_REGISTRY
-from backend.models.events import WebSocketEnvelope
+from backend.models.events import WebSocketEnvelope, ModalitySource
+from backend.orchestrator import AssistantOrchestrator
 
 class ConnectionManager:
     def __init__(self):
@@ -26,7 +28,7 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-def create_app() -> FastAPI:
+def create_app(orchestrator: Optional[AssistantOrchestrator] = None) -> FastAPI:
     settings = get_settings()
     app = FastAPI(title="Silent Meeting Assistant API", version="0.1.0")
 
@@ -38,6 +40,23 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    # Bridge orchestrator callbacks to async WebSocket broadcast
+    loop = None
+
+    def broadcast_sync(event_type: str, data: Dict[str, Any]):
+        nonlocal loop
+        env = WebSocketEnvelope(event=event_type, data=data)
+        try:
+            current_loop = asyncio.get_running_loop()
+            current_loop.create_task(manager.broadcast(env))
+        except RuntimeError:
+            if loop and loop.is_running():
+                asyncio.run_coroutine_threadsafe(manager.broadcast(env), loop)
+
+    active_orchestrator = orchestrator or AssistantOrchestrator(on_broadcast=broadcast_sync)
+    if orchestrator:
+        orchestrator.on_broadcast = broadcast_sync
+
     @app.get("/health")
     def health():
         return {"status": "ok", "mode": settings.dev_mode}
@@ -48,6 +67,8 @@ def create_app() -> FastAPI:
 
     @app.websocket("/ws/events")
     async def websocket_endpoint(websocket: WebSocket):
+        nonlocal loop
+        loop = asyncio.get_running_loop()
         await manager.connect(websocket)
         try:
             await websocket.send_json(
@@ -56,8 +77,28 @@ def create_app() -> FastAPI:
             while True:
                 data = await websocket.receive_json()
                 action = data.get("action")
+
                 if action == "ping":
                     await websocket.send_json({"event": "pong"})
+
+                elif action == "simulate_intent":
+                    intent = data.get("intent", "QUESTION")
+                    source_str = data.get("source", "gesture")
+                    source = ModalitySource.GESTURE if source_str == "gesture" else ModalitySource.LIP
+                    confidence = float(data.get("confidence", 0.95))
+                    active_orchestrator.process_intent(source=source, intent=intent, confidence=confidence)
+
+                elif action == "detect_gesture":
+                    landmarks = data.get("landmarks", [])
+                    active_orchestrator.process_hand_landmarks(landmarks)
+
+                elif action == "update_context":
+                    snippet = data.get("snippet", "")
+                    active_orchestrator.set_meeting_context(snippet)
+                    await websocket.send_json(
+                        WebSocketEnvelope(event="context_updated", data={"status": "ok", "snippet": snippet}).model_dump()
+                    )
+
         except WebSocketDisconnect:
             manager.disconnect(websocket)
 
