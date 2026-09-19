@@ -27,8 +27,11 @@ export function useWebSocket(url: string = 'ws://127.0.0.1:8000/ws/events') {
         try {
           const envelope: WebSocketMessage = JSON.parse(event.data);
           if (envelope.event === 'message_staged') {
-            const { event: commEvent, normalized_text } = envelope.data;
-            stageEvent(commEvent as CommunicationEvent, normalized_text);
+            const { event: commEvent, normalized_text, is_refined } = envelope.data;
+            stageEvent(commEvent as CommunicationEvent, normalized_text, !is_refined);
+          } else if (envelope.event === 'message_refined') {
+            const { refined_text } = envelope.data;
+            useAssistantStore.getState().refineStagedMessage(refined_text);
           }
         } catch (err) {
           console.error('Failed to parse WebSocket message:', err);

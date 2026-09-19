@@ -6,9 +6,11 @@ interface AssistantState {
   mode: AppMode;
   activeEvent: CommunicationEvent | null;
   stagedMessage: string;
+  isRefining: boolean;
   history: DispatchedMessage[];
   setMode: (mode: AppMode) => void;
-  stageEvent: (event: CommunicationEvent, normalizedText: string) => void;
+  stageEvent: (event: CommunicationEvent, normalizedText: string, isRefining?: boolean) => void;
+  refineStagedMessage: (refinedText: string) => void;
   confirmStagedMessage: () => void;
   cancelStagedMessage: () => void;
 }
@@ -18,12 +20,21 @@ export const useAssistantStore = create<AssistantState>((set, get) => ({
   mode: 'AUTO',
   activeEvent: null,
   stagedMessage: '',
+  isRefining: false,
   history: [],
   setMode: (mode) => set({ mode }),
-  stageEvent: (event, normalizedText) => set({
+  stageEvent: (event, normalizedText, isRefining = true) => set({
     activeEvent: event,
     stagedMessage: normalizedText,
+    isRefining,
     status: 'AWAITING_CONFIRMATION'
+  }),
+  refineStagedMessage: (refinedText: string) => set((state) => {
+    if (!state.activeEvent) return {};
+    return {
+      stagedMessage: refinedText,
+      isRefining: false,
+    };
   }),
   confirmStagedMessage: () => {
     const { activeEvent, stagedMessage, history } = get();
