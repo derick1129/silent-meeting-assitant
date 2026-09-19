@@ -10,16 +10,37 @@ import { ShieldCheck } from 'lucide-react';
 
 export const App: React.FC = () => {
   const { history } = useAssistantStore();
-  const { isConnected, simulateIntent, updateContext, detectGesture } = useWebSocket();
+  const { isConnected, simulateIntent, updateContext, detectGesture, detectLip, sendAudioChunk } = useWebSocket();
+
+  const handleGestureDetected = React.useCallback(
+    (_intent: string, landmarks: any[]) => {
+      detectGesture(landmarks);
+    },
+    [detectGesture]
+  );
+
+  const handleLipDetected = React.useCallback(
+    (landmarks: any[]) => {
+      detectLip(landmarks);
+    },
+    [detectLip]
+  );
 
   return (
     <div className="w-[390px] min-h-[540px] max-h-[90vh] bg-gray-950 text-gray-200 flex flex-col font-sans border border-gray-800 shadow-2xl rounded-2xl overflow-hidden">
       <Header />
       
       <div className="p-4 space-y-3.5 flex-1 overflow-y-auto">
-        <CameraFeed onGestureDetected={(_intent, landmarks) => detectGesture(landmarks)} />
+        <CameraFeed
+          onGestureDetected={handleGestureDetected}
+          onLipDetected={handleLipDetected}
+        />
 
-        <ContextDrawer onUpdateContext={updateContext} isConnected={isConnected} />
+        <ContextDrawer
+          onUpdateContext={updateContext}
+          onSendAudioChunk={sendAudioChunk}
+          isConnected={isConnected}
+        />
         
         <DetectionCard />
 

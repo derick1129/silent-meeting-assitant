@@ -1,72 +1,40 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useCallback } from 'react';
 import { ChevronDown, ChevronUp, Layers, Check, Mic, MicOff } from 'lucide-react';
+import { useAudioStreamer } from '../hooks/useAudioStreamer';
 
 interface ContextDrawerProps {
   onUpdateContext: (snippet: string) => void;
+  onSendAudioChunk?: (base64Chunk: string) => void;
   isConnected: boolean;
 }
 
-export const ContextDrawer: React.FC<ContextDrawerProps> = ({ onUpdateContext, isConnected }) => {
+export const ContextDrawer: React.FC<ContextDrawerProps> = ({
+  onUpdateContext,
+  onSendAudioChunk,
+  isConnected,
+}) => {
   const [isOpen, setIsOpen] = useState(false);
   const [snippet, setSnippet] = useState(
     'Discussing whether to migrate our database to PostgreSQL or keep MongoDB.'
   );
   const [saved, setSaved] = useState(false);
-  const [isListening, setIsListening] = useState(false);
-  const [speechSupported, setSpeechSupported] = useState(false);
-  const recognitionRef = useRef<any>(null);
 
-  useEffect(() => {
-    const SpeechRecognition =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (SpeechRecognition) {
-      setSpeechSupported(true);
-      const recognition = new SpeechRecognition();
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.lang = 'en-US';
-
-      recognition.onresult = (event: any) => {
-        let transcript = '';
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          transcript += event.results[i][0].transcript + ' ';
+  const { isStreaming, startStreaming, stopStreaming } = useAudioStreamer(
+    useCallback(
+      (b64Chunk: string) => {
+        if (onSendAudioChunk) {
+          onSendAudioChunk(b64Chunk);
         }
-        if (transcript.trim()) {
-          setSnippet((prev) => {
-            const updated = (prev + ' ' + transcript.trim()).slice(-350);
-            onUpdateContext(updated);
-            return updated;
-          });
-          setSaved(true);
-          setTimeout(() => setSaved(false), 2000);
-        }
-      };
+      },
+      [onSendAudioChunk]
+    )
+  );
 
-      recognition.onerror = (err: any) => {
-        console.error('Speech recognition error:', err);
-        setIsListening(false);
-      };
-
-      recognition.onend = () => {
-        setIsListening(false);
-      };
-
-      recognitionRef.current = recognition;
-    }
-  }, [onUpdateContext]);
-
-  const toggleListening = () => {
-    if (!recognitionRef.current) return;
-    if (isListening) {
-      recognitionRef.current.stop();
-      setIsListening(false);
+  const toggleStreaming = () => {
+    if (isStreaming) {
+      stopStreaming();
     } else {
-      try {
-        recognitionRef.current.start();
-        setIsListening(true);
-      } catch (err) {
-        console.error('Failed to start speech recognition:', err);
-      }
+      startStreaming();
     }
   };
 
@@ -89,20 +57,18 @@ export const ContextDrawer: React.FC<ContextDrawerProps> = ({ onUpdateContext, i
           {isOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
         </button>
 
-        {speechSupported && (
-          <button
-            onClick={toggleListening}
-            title={isListening ? 'Stop live audio transcription' : 'Start live audio transcription from microphone'}
-            className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-mono transition ${
-              isListening
-                ? 'bg-rose-950 text-rose-300 border border-rose-800 animate-pulse'
-                : 'bg-gray-800 text-gray-300 hover:text-white border border-gray-700'
-            }`}
-          >
-            {isListening ? <MicOff className="w-3 h-3 text-rose-400" /> : <Mic className="w-3 h-3 text-indigo-400" />}
-            <span>{isListening ? 'Transcribing...' : 'Auto-listen'}</span>
-          </button>
-        )}
+        <button
+          onClick={toggleStreaming}
+          title={isStreaming ? 'Stop Deepgram Live Audio' : 'Start Deepgram Live Audio Stream'}
+          className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-mono transition ${
+            isStreaming
+              ? 'bg-rose-950 text-rose-300 border border-rose-800 animate-pulse'
+              : 'bg-indigo-950 text-indigo-300 hover:bg-indigo-900 border border-indigo-800'
+          }`}
+        >
+          {isStreaming ? <MicOff className="w-3 h-3 text-rose-400" /> : <Mic className="w-3 h-3 text-indigo-400" />}
+          <span>{isStreaming ? 'Deepgram Live' : 'Stream Mic'}</span>
+        </button>
       </div>
 
       {isOpen && (

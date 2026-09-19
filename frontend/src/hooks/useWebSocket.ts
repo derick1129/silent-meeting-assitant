@@ -80,11 +80,21 @@ export function useWebSocket(url: string = 'ws://127.0.0.1:8000/ws/events') {
     sendAction('detect_gesture', { landmarks });
   }, [sendAction]);
 
+  const detectLip = useCallback((landmarks: any[]) => {
+    sendAction('detect_lip', { landmarks });
+  }, [sendAction]);
+
+  const sendAudioChunk = useCallback((base64Data: string) => {
+    sendAction('audio_chunk', { data: base64Data });
+  }, [sendAction]);
+
   return {
     isConnected,
     sendAction,
     simulateIntent,
     updateContext,
     detectGesture,
+    detectLip,
+    sendAudioChunk,
   };
 }

@@ -7,9 +7,10 @@ import { useAssistantStore } from '../store/useAssistantStore';
 
 interface CameraFeedProps {
   onGestureDetected: (intent: string, landmarks: any[]) => void;
+  onLipDetected?: (landmarks: any[]) => void;
 }
 
-export const CameraFeed: React.FC<CameraFeedProps> = ({ onGestureDetected }) => {
+export const CameraFeed: React.FC<CameraFeedProps> = ({ onGestureDetected, onLipDetected: _onLipDetected }) => {
   const [isActive, setIsActive] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [detectedGesture, setDetectedGesture] = useState<string | null>(null);
@@ -26,6 +27,7 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ onGestureDetected }) => 
   const { stageEvent } = useAssistantStore();
 
   const handleResults = useCallback((results: Results) => {
+    console.log('[CameraFeed] handleResults called! Hands detected:', results.multiHandLandmarks?.length || 0);
     setIsInitializing(false);
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -87,12 +89,17 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ onGestureDetected }) => 
   useEffect(() => {
     if (!isActive || !videoRef.current) return;
 
+    console.log('[CameraFeed] Initializing camera & MediaPipe Hands...');
     setPermissionError(null);
     setIsInitializing(true);
 
     try {
       const hands = new Hands({
-        locateFile: (file) => `/mediapipe/hands/${file}`,
+        locateFile: (file) => {
+          const path = `/mediapipe/hands/${file}`;
+          console.log('[CameraFeed] locateFile requested:', file, '->', path);
+          return path;
+        },
       });
 
       hands.setOptions({
@@ -105,26 +112,37 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ onGestureDetected }) => 
       hands.onResults(handleResults);
       handsInstanceRef.current = hands;
 
+      let frameCount = 0;
       const camera = new MediaPipeCamera(videoRef.current, {
         onFrame: async () => {
           if (videoRef.current && handsInstanceRef.current) {
-            await handsInstanceRef.current.send({ image: videoRef.current });
+            if (frameCount++ % 30 === 0) {
+              console.log('[CameraFeed] onFrame tick', frameCount, 'video readyState:', videoRef.current.readyState, 'size:', videoRef.current.videoWidth, 'x', videoRef.current.videoHeight);
+            }
+            try {
+              await handsInstanceRef.current.send({ image: videoRef.current });
+            } catch (frameErr) {
+              console.error('[CameraFeed] Error in hands.send:', frameErr);
+            }
           }
         },
         width: 320,
         height: 240,
       });
 
-      camera.start().catch((err: any) => {
-        console.error('Camera start failed:', err);
-        setPermissionError('Camera permission denied or camera unavailable in this browser window.');
-        setIsActive(false);
-        setIsInitializing(false);
-      });
+      console.log('[CameraFeed] Starting MediaPipeCamera...');
+      camera.start()
+        .then(() => console.log('[CameraFeed] camera.start() resolved!'))
+        .catch((err: any) => {
+          console.error('[CameraFeed] Camera start failed:', err);
+          setPermissionError('Camera permission denied or camera unavailable in this browser window: ' + (err?.message || err));
+          setIsActive(false);
+          setIsInitializing(false);
+        });
 
       cameraInstanceRef.current = camera;
     } catch (e: any) {
-      console.error('Failed to initialize MediaPipe Hands:', e);
+      console.error('[CameraFeed] Failed to initialize MediaPipe Hands:', e);
       setPermissionError(e.message || 'MediaPipe initialization error');
       setIsActive(false);
       setIsInitializing(false);
