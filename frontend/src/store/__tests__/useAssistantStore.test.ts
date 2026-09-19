@@ -48,4 +48,34 @@ describe('useAssistantStore', () => {
     expect(useAssistantStore.getState().status).toBe('IDLE');
     expect(useAssistantStore.getState().activeEvent).toBeNull();
   });
+
+  it('manages meeting copilot solution lifecycle and stages answer', () => {
+    const { setSolution, clearSolution, setAutoSuggest, stageSolutionAsAnswer } = useAssistantStore.getState();
+    setAutoSuggest(true);
+    expect(useAssistantStore.getState().autoSuggest).toBe(true);
+
+    const testSolution = {
+      query: 'Should we migrate to PostgreSQL?',
+      suggested_answer: 'Yes, PostgreSQL provides strong ACID compliance and JSON support.',
+      solution_points: [
+        'Evaluate current MongoDB query patterns.',
+        'Benchmark write throughput under load.'
+      ],
+      category: 'Database Architecture',
+      timestamp: Date.now()
+    };
+
+    setSolution(testSolution);
+    expect(useAssistantStore.getState().activeSolution).toEqual(testSolution);
+
+    // Stage solution as answer
+    stageSolutionAsAnswer(testSolution);
+    const stagedState = useAssistantStore.getState();
+    expect(stagedState.status).toBe('AWAITING_CONFIRMATION');
+    expect(stagedState.stagedMessage).toBe(testSolution.suggested_answer);
+    expect(stagedState.activeEvent?.intent).toBe('SUGGESTED_ANSWER');
+
+    clearSolution();
+    expect(useAssistantStore.getState().activeSolution).toBeNull();
+  });
 });

@@ -7,6 +7,7 @@ from backend.llm.engine import ContextLLMEngine
 from backend.vision.gesture import classify_hand_gesture
 from backend.vision.lips import extract_lip_features, LipSequenceBuffer
 from backend.ml.lip_model import LipGRUModel, VOCABULARY_CLASSES, predict_lip_intent
+from backend.vsr.types import VSRPrediction
 import os
 import torch
 
@@ -39,6 +40,12 @@ class AssistantOrchestrator:
     def set_meeting_context(self, snippet: str) -> None:
         self.llm.add_meeting_context(snippet)
 
+    def generate_speech_solution(self, query: str) -> Dict[str, Any]:
+        result = self.llm.generate_solution_from_speech(query)
+        if self.on_broadcast:
+            self.on_broadcast("solution_generated", result)
+        return result
+
     def process_lip_landmarks(self, landmarks: List[Dict[str, float]]) -> Optional[str]:
         features = extract_lip_features(landmarks)
         if features is None:
@@ -57,10 +64,33 @@ class AssistantOrchestrator:
         intent, confidence = result
         return self.process_intent(ModalitySource.GESTURE, intent, confidence)
 
-    def process_intent(self, source: ModalitySource, intent: str, confidence: float = 0.95) -> Optional[str]:
-        event = self.fusion.process_event(source, intent, confidence)
+    def process_vsr_prediction(self, prediction: VSRPrediction) -> Optional[str]:
+        if not prediction.intent or prediction.confidence < self.settings.vsr_min_confidence:
+            return None
+        return self.process_intent(
+            source=ModalitySource.LIP,
+            intent=prediction.intent,
+            confidence=prediction.confidence,
+            metadata={
+                "recognized_text": prediction.text,
+                "model_id": prediction.model_id,
+                "latency_ms": prediction.latency_ms,
+            },
+        )
+
+    def process_intent(
+        self,
+        source: ModalitySource,
+        intent: str,
+        confidence: float = 0.95,
+        raw_text_override: str | None = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Optional[str]:
+        event = self.fusion.process_event(source, intent, confidence, raw_text_override)
         if not event:
             return None
+        if metadata:
+            event.metadata.update(metadata)
 
         # PHASE 1: Immediate zero-latency broadcast with base text
         base_text = event.raw_text

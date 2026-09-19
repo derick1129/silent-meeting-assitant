@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { AppMode, AppStatus, CommunicationEvent, DispatchedMessage } from '../types';
+import { AppMode, AppStatus, CommunicationEvent, DispatchedMessage, MeetingSolution } from '../types';
 
 interface AssistantState {
   status: AppStatus;
@@ -9,12 +9,20 @@ interface AssistantState {
   isRefining: boolean;
   history: DispatchedMessage[];
   meetingContext: string;
+  activeSolution: MeetingSolution | null;
+  isGeneratingSolution: boolean;
+  autoSuggest: boolean;
   setMode: (mode: AppMode) => void;
   setMeetingContext: (ctx: string) => void;
   stageEvent: (event: CommunicationEvent, normalizedText: string, isRefining?: boolean) => void;
   refineStagedMessage: (refinedText: string) => void;
   confirmStagedMessage: () => void;
   cancelStagedMessage: () => void;
+  setSolution: (solution: MeetingSolution | null) => void;
+  clearSolution: () => void;
+  setIsGeneratingSolution: (isGenerating: boolean) => void;
+  setAutoSuggest: (enabled: boolean) => void;
+  stageSolutionAsAnswer: (solution: MeetingSolution) => void;
 }
 
 export const useAssistantStore = create<AssistantState>((set, get) => ({
@@ -25,6 +33,9 @@ export const useAssistantStore = create<AssistantState>((set, get) => ({
   isRefining: false,
   history: [],
   meetingContext: 'Discussing whether to migrate our database to PostgreSQL or keep MongoDB.',
+  activeSolution: null,
+  isGeneratingSolution: false,
+  autoSuggest: false,
   setMode: (mode) => set({ mode }),
   setMeetingContext: (ctx) => set({ meetingContext: ctx }),
   stageEvent: (event, normalizedText, isRefining = true) => set({
@@ -60,5 +71,24 @@ export const useAssistantStore = create<AssistantState>((set, get) => ({
     activeEvent: null,
     stagedMessage: '',
     status: 'IDLE'
-  })
+  }),
+  setSolution: (solution) => set({ activeSolution: solution }),
+  clearSolution: () => set({ activeSolution: null }),
+  setIsGeneratingSolution: (isGeneratingSolution) => set({ isGeneratingSolution }),
+  setAutoSuggest: (autoSuggest) => set({ autoSuggest }),
+  stageSolutionAsAnswer: (solution) => {
+    const event: CommunicationEvent = {
+      id: `solution-${Date.now()}`,
+      source: 'speech',
+      intent: 'SUGGESTED_ANSWER',
+      raw_text: solution.suggested_answer,
+      confidence: 1.0,
+    };
+    set({
+      activeEvent: event,
+      stagedMessage: solution.suggested_answer,
+      isRefining: false,
+      status: 'AWAITING_CONFIRMATION',
+    });
+  },
 }));

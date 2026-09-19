@@ -53,8 +53,18 @@ export function arrayBufferToBase64(buffer: ArrayBuffer | ArrayBufferLike): stri
   return (globalThis as any).Buffer ? (globalThis as any).Buffer.from(binary, 'binary').toString('base64') : '';
 }
 
+export function calculateRMS(buffer: Float32Array): number {
+  let sum = 0;
+  for (let i = 0; i < buffer.length; i++) {
+    sum += buffer[i] * buffer[i];
+  }
+  const rms = Math.sqrt(sum / (buffer.length || 1));
+  return Math.min(1, Math.round(rms * 500) / 100);
+}
+
 export function useAudioStreamer(onChunk: (base64Chunk: string) => void) {
   const [isStreaming, setIsStreaming] = useState(false);
+  const [audioLevel, setAudioLevel] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
 
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -85,6 +95,9 @@ export function useAudioStreamer(onChunk: (base64Chunk: string) => void) {
 
       processor.onaudioprocess = (e) => {
         const inputData = e.inputBuffer.getChannelData(0);
+        const level = calculateRMS(inputData);
+        setAudioLevel(level);
+
         const currentRate = audioCtx.sampleRate || 16000;
         const resampled = downsampleBuffer(inputData, currentRate, 16000);
         const pcm16 = convertFloat32ToInt16(resampled);
@@ -115,11 +128,13 @@ export function useAudioStreamer(onChunk: (base64Chunk: string) => void) {
       streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
     }
+    setAudioLevel(0);
     setIsStreaming(false);
   }, []);
 
   return {
     isStreaming,
+    audioLevel,
     error,
     startStreaming,
     stopStreaming,

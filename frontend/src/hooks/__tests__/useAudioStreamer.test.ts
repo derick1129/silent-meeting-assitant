@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { convertFloat32ToInt16, arrayBufferToBase64, downsampleBuffer } from '../useAudioStreamer';
+import { convertFloat32ToInt16, arrayBufferToBase64, downsampleBuffer, calculateRMS } from '../useAudioStreamer';
 
 describe('useAudioStreamer PCM Audio Conversion', () => {
   it('converts Float32 audio samples (-1.0 to 1.0) to Int16 linear PCM correctly', () => {
@@ -40,5 +40,15 @@ describe('useAudioStreamer PCM Audio Conversion', () => {
     const testBytes = new Uint8Array([72, 101, 108, 108, 111]); // "Hello"
     const b64 = arrayBufferToBase64(testBytes.buffer);
     expect(b64).toBe('SGVsbG8=');
+  });
+
+  it('calculates RMS audio energy level correctly', () => {
+    const silence = new Float32Array([0, 0, 0, 0]);
+    expect(calculateRMS(silence)).toBe(0);
+
+    const active = new Float32Array([0.2, -0.2, 0.2, -0.2]);
+    const level = calculateRMS(active);
+    expect(level).toBeGreaterThan(0);
+    expect(level).toBeLessThanOrEqual(1);
   });
 });

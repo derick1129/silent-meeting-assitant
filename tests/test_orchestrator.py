@@ -3,6 +3,7 @@ from backend.orchestrator import AssistantOrchestrator
 from backend.models.events import ModalitySource
 
 from backend.llm.engine import ContextLLMEngine
+from backend.vsr.types import VSRPrediction
 
 def test_orchestrator_process_intent():
     dispatched = []
@@ -83,4 +84,44 @@ def test_orchestrator_lip_landmarks():
 
     assert orchestrator.lip_buffer.is_full() is True
 
+
+def test_process_vsr_prediction_stages_command_with_recognized_text_metadata():
+    broadcasts = []
+    orchestrator = AssistantOrchestrator(
+        on_broadcast=lambda event, data: broadcasts.append((event, data)),
+        llm_engine=ContextLLMEngine(api_key=""),
+    )
+    prediction = VSRPrediction(
+        text="can you repeat that",
+        intent="PLEASE_REPEAT",
+        confidence=0.91,
+        latency_ms=420.0,
+        model_id="test/model",
+    )
+
+    result = orchestrator.process_vsr_prediction(prediction)
+
+    assert result == "Could you please repeat that?"
+    assert broadcasts[-1][0] == "message_staged"
+    event = broadcasts[-1][1]["event"]
+    assert event["raw_text"] == "Could you please repeat that?"
+    assert event["metadata"]["recognized_text"] == "can you repeat that"
+
+
+def test_process_vsr_prediction_does_not_stage_low_confidence_prediction():
+    broadcasts = []
+    orchestrator = AssistantOrchestrator(
+        on_broadcast=lambda event, data: broadcasts.append((event, data)),
+        llm_engine=ContextLLMEngine(api_key=""),
+    )
+    prediction = VSRPrediction(
+        text="yes",
+        intent="YES",
+        confidence=0.79,
+        latency_ms=100.0,
+        model_id="test/model",
+    )
+
+    assert orchestrator.process_vsr_prediction(prediction) is None
+    assert broadcasts == []
 

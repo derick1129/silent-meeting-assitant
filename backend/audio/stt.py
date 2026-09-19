@@ -42,6 +42,7 @@ class MockSTTProvider(BaseSTTProvider):
 import threading
 import time
 import logging
+from collections import deque
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +55,7 @@ class DeepgramSTTProvider(BaseSTTProvider):
         self._socket = None
         self._thread = None
         self._running = False
+        self._pending_chunks = deque(maxlen=60)  # Pre-buffers up to ~3 seconds during handshake
         self._lock = threading.Lock()
 
     async def start(self) -> None:
@@ -81,6 +83,13 @@ class DeepgramSTTProvider(BaseSTTProvider):
                         with self._lock:
                             self._socket = socket
                             self.is_connected = True
+                            # Flush any audio chunks recorded during connection establishment
+                            while self._pending_chunks:
+                                pending = self._pending_chunks.popleft()
+                                try:
+                                    socket.send_media(pending)
+                                except Exception:
+                                    break
                         logger.info("[DeepgramSTT] Connected to Deepgram streaming socket successfully.")
 
                         for message in socket:
@@ -116,6 +125,7 @@ class DeepgramSTTProvider(BaseSTTProvider):
         self._running = False
         with self._lock:
             self.is_connected = False
+            self._pending_chunks.clear()
             if self._socket:
                 try:
                     self._socket.send_finalize()
@@ -139,4 +149,7 @@ class DeepgramSTTProvider(BaseSTTProvider):
                     self._socket.send_media(chunk)
                 except Exception as exc:
                     logger.warning(f"[DeepgramSTT] Error sending media chunk: {exc}")
+            else:
+                self._pending_chunks.append(chunk)
+
 

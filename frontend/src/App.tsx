@@ -4,6 +4,7 @@ import { DetectionCard } from './components/DetectionCard';
 import { ContextDrawer } from './components/ContextDrawer';
 import { CameraFeed } from './components/CameraFeed';
 import { SimulationBar } from './components/SimulationBar';
+import { MeetingCopilotCard } from './components/MeetingCopilotCard';
 import { useAssistantStore } from './store/useAssistantStore';
 import { useWebSocket } from './hooks/useWebSocket';
 import { ShieldCheck } from 'lucide-react';
@@ -19,6 +20,8 @@ export const App: React.FC = () => {
     sendAudioChunk,
     startAudio,
     stopAudio,
+    generateSolution,
+    setAutoSuggest,
   } = useWebSocket();
 
   const handleGestureDetected = React.useCallback(
@@ -50,8 +53,12 @@ export const App: React.FC = () => {
           onSendAudioChunk={sendAudioChunk}
           onStartAudio={startAudio}
           onStopAudio={stopAudio}
+          onGenerateSolution={generateSolution}
+          onToggleAutoSuggest={setAutoSuggest}
           isConnected={isConnected}
         />
+
+        <MeetingCopilotCard />
         
         <DetectionCard />
 
@@ -86,3 +93,4 @@ export const App: React.FC = () => {
     </div>
   );
 };
+

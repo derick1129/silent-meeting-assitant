@@ -37,6 +37,16 @@ export function useWebSocket(url: string = 'ws://127.0.0.1:8000/ws/events') {
             if (fullContext) {
               useAssistantStore.getState().setMeetingContext(fullContext);
             }
+          } else if (envelope.event === 'solution_generated') {
+            const solution = envelope.data;
+            if (solution && solution.suggested_answer) {
+              useAssistantStore.getState().setSolution(solution);
+              useAssistantStore.getState().setIsGeneratingSolution(false);
+            }
+          } else if (envelope.event === 'auto_suggest_status') {
+            if (typeof envelope.data?.enabled === 'boolean') {
+              useAssistantStore.getState().setAutoSuggest(envelope.data.enabled);
+            }
           }
         } catch (err) {
           console.error('Failed to parse WebSocket message:', err);
@@ -101,6 +111,16 @@ export function useWebSocket(url: string = 'ws://127.0.0.1:8000/ws/events') {
     sendAction('stop_audio');
   }, [sendAction]);
 
+  const generateSolution = useCallback((query: string = '') => {
+    useAssistantStore.getState().setIsGeneratingSolution(true);
+    sendAction('generate_solution', { query });
+  }, [sendAction]);
+
+  const setAutoSuggest = useCallback((enabled: boolean) => {
+    useAssistantStore.getState().setAutoSuggest(enabled);
+    sendAction('set_auto_suggest', { enabled });
+  }, [sendAction]);
+
   return {
     isConnected,
     sendAction,
@@ -111,5 +131,7 @@ export function useWebSocket(url: string = 'ws://127.0.0.1:8000/ws/events') {
     sendAudioChunk,
     startAudio,
     stopAudio,
+    generateSolution,
+    setAutoSuggest,
   };
 }

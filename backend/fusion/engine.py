@@ -10,7 +10,13 @@ class InputFusionEngine:
         self.last_emitted_timestamps: Dict[str, float] = {}
         self.recent_inputs: Dict[ModalitySource, Dict[str, float]] = {}
 
-    def process_event(self, source: ModalitySource, intent: str, confidence: float) -> Optional[CommunicationEvent]:
+    def process_event(
+        self,
+        source: ModalitySource,
+        intent: str,
+        confidence: float,
+        raw_text_override: str | None = None,
+    ) -> Optional[CommunicationEvent]:
         if confidence < self.confidence_threshold:
             return None
 
@@ -21,7 +27,11 @@ class InputFusionEngine:
 
         self.last_emitted_timestamps[intent] = now
         cmd = get_command_by_intent(intent)
-        raw_text = cmd.default_text if cmd else intent
+        raw_text = (
+            raw_text_override
+            if cmd and raw_text_override and raw_text_override.strip()
+            else (cmd.default_text if cmd else intent)
+        )
 
         return CommunicationEvent(
             source=source,

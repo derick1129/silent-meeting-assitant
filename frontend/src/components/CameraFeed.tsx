@@ -8,6 +8,7 @@ import { extractLipPoints } from '../utils/lipExtractor';
 import { LipKinematicsTracker } from '../utils/lipClassifier';
 import { useAssistantStore } from '../store/useAssistantStore';
 import { useCommandStore } from '../store/useCommandStore';
+import { useSilentPhraseCapture } from '../hooks/useSilentPhraseCapture';
 
 interface CameraFeedProps {
   onGestureDetected: (intent: string, landmarks: any[]) => void;
@@ -34,6 +35,7 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ onGestureDetected, onLip
   const lastEmittedRef = useRef<number>(0);
 
   const { stageEvent } = useAssistantStore();
+  const silentCapture = useSilentPhraseCapture(videoRef);
 
   const handleFaceMeshResults = useCallback((results: FaceMeshResults) => {
     const canvas = canvasRef.current;
@@ -256,6 +258,14 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ onGestureDetected, onLip
     setDetectedGesture(null);
   };
 
+  const captureLabel = silentCapture.state === 'recording'
+    ? 'Recording…'
+    : silentCapture.state === 'processing'
+    ? 'Reading…'
+    : silentCapture.state === 'error'
+    ? 'Retry silent phrase'
+    : 'Read silent phrase';
+
   return (
     <div className="bg-gray-900/80 border border-gray-800 rounded-xl overflow-hidden shadow-lg">
       <div className="p-2.5 flex items-center justify-between text-xs border-b border-gray-800/80">
@@ -282,6 +292,16 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ onGestureDetected, onLip
 
         {isActive && (
           <button
+            onClick={silentCapture.state === 'error' ? silentCapture.reset : silentCapture.startCapture}
+            disabled={silentCapture.state === 'recording' || silentCapture.state === 'processing'}
+            className="px-2.5 py-1 rounded-md text-[11px] font-semibold bg-emerald-950 text-emerald-300 border border-emerald-800 hover:bg-emerald-900 disabled:opacity-50"
+          >
+            {captureLabel}
+          </button>
+        )}
+
+        {isActive && (
+          <button
             onClick={() => setIsMinimized(!isMinimized)}
             className="text-gray-400 hover:text-white transition p-1"
           >
@@ -293,6 +313,18 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ onGestureDetected, onLip
       {permissionError && (
         <div className="p-2.5 bg-rose-950/60 border-b border-rose-900/60 text-rose-300 text-[11px]">
           {permissionError}
+        </div>
+      )}
+
+      {silentCapture.error && (
+        <div className="px-2.5 py-1.5 bg-rose-950/60 border-b border-rose-900/60 text-rose-300 text-[11px]">
+          {silentCapture.error}
+        </div>
+      )}
+
+      {silentCapture.state === 'success' && silentCapture.prediction && (
+        <div className="px-2.5 py-1.5 bg-emerald-950/40 border-b border-emerald-900/60 text-emerald-300 text-[11px]">
+          Read “{silentCapture.prediction.text}” in {Math.round(silentCapture.prediction.latency_ms)} ms
         </div>
       )}
 

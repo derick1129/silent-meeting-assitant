@@ -25,3 +25,22 @@ def test_contextual_expansion():
     result = engine.normalize_intent(event)
     assert len(result) > 5
     assert "speak" in result.lower()
+
+def test_generate_solution_from_speech_fallback():
+    engine = ContextLLMEngine(api_key="")
+    query = "How should we scale our API to handle 10,000 requests per second?"
+    solution = engine.generate_solution_from_speech(query)
+    
+    assert solution["query"] == query
+    assert len(solution["suggested_answer"]) > 10
+    assert len(solution["solution_points"]) >= 2
+    assert "category" in solution
+    assert "timestamp" in solution and solution["timestamp"] > 0
+
+def test_generate_solution_empty_query():
+    engine = ContextLLMEngine(api_key="")
+    solution = engine.generate_solution_from_speech("   ")
+    assert solution["query"] == ""
+    assert solution["suggested_answer"] == ""
+    assert solution["solution_points"] == []
+

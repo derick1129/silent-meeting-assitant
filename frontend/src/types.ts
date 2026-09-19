@@ -24,3 +24,20 @@ export interface CommandDefinition {
   supported_modalities: string[];
 }
 
+export interface MeetingSolution {
+  query: string;
+  suggested_answer: string;
+  solution_points: string[];
+  category: string;
+  timestamp: number;
+}
+
+export type SilentPhraseCaptureState = 'idle' | 'recording' | 'processing' | 'success' | 'error';
+
+export interface VSRPrediction {
+  text: string;
+  intent: string | null;
+  confidence: number;
+  latency_ms: number;
+  model_id: string;
+}
