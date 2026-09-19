@@ -89,8 +89,8 @@ export function useAudioStreamer(onChunk: (base64Chunk: string) => void) {
       audioContextRef.current = audioCtx;
 
       const source = audioCtx.createMediaStreamSource(stream);
-      // Process in 4096 sample buffers (~256 ms of 16kHz audio)
-      const processor = audioCtx.createScriptProcessor(4096, 1, 1);
+      // Process in 2048 sample buffers (~128 ms of 16kHz audio for low-latency streaming)
+      const processor = audioCtx.createScriptProcessor(2048, 1, 1);
       processorRef.current = processor;
 
       processor.onaudioprocess = (e) => {
