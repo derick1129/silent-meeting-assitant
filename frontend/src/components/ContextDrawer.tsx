@@ -2,21 +2,25 @@ import React, { useState, useCallback } from 'react';
 import { ChevronDown, ChevronUp, Layers, Check, Mic, MicOff } from 'lucide-react';
 import { useAudioStreamer } from '../hooks/useAudioStreamer';
 
+import { useAssistantStore } from '../store/useAssistantStore';
+
 interface ContextDrawerProps {
   onUpdateContext: (snippet: string) => void;
   onSendAudioChunk?: (base64Chunk: string) => void;
+  onStartAudio?: () => void;
+  onStopAudio?: () => void;
   isConnected: boolean;
 }
 
 export const ContextDrawer: React.FC<ContextDrawerProps> = ({
   onUpdateContext,
   onSendAudioChunk,
+  onStartAudio,
+  onStopAudio,
   isConnected,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [snippet, setSnippet] = useState(
-    'Discussing whether to migrate our database to PostgreSQL or keep MongoDB.'
-  );
+  const { meetingContext, setMeetingContext } = useAssistantStore();
   const [saved, setSaved] = useState(false);
 
   const { isStreaming, startStreaming, stopStreaming } = useAudioStreamer(
@@ -33,14 +37,16 @@ export const ContextDrawer: React.FC<ContextDrawerProps> = ({
   const toggleStreaming = () => {
     if (isStreaming) {
       stopStreaming();
+      if (onStopAudio) onStopAudio();
     } else {
+      if (onStartAudio) onStartAudio();
       startStreaming();
     }
   };
 
   const handleSave = () => {
-    if (!snippet.trim()) return;
-    onUpdateContext(snippet.trim());
+    if (!meetingContext.trim()) return;
+    onUpdateContext(meetingContext.trim());
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -78,11 +84,17 @@ export const ContextDrawer: React.FC<ContextDrawerProps> = ({
           </p>
           <textarea
             rows={2}
-            value={snippet}
-            onChange={(e) => setSnippet(e.target.value)}
-            className="w-full bg-gray-950 border border-gray-800 rounded-lg p-2 text-gray-200 text-xs focus:outline-none focus:border-indigo-500 transition"
+            value={meetingContext}
+            onChange={(e) => setMeetingContext(e.target.value)}
+            className="w-full bg-gray-950 border border-gray-800 rounded-lg p-2 text-gray-200 text-xs focus:outline-none focus:border-indigo-500 transition font-sans"
             placeholder="e.g. Discussing project timeline, architecture choices..."
           />
+          {isStreaming && (
+            <div className="text-[10px] text-emerald-400 font-mono flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span>Deepgram live: incoming speech populates context automatically</span>
+            </div>
+          )}
           <button
             disabled={!isConnected}
             onClick={handleSave}

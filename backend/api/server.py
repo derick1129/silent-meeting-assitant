@@ -69,6 +69,7 @@ def create_app(
             broadcast_sync("context_updated", {
                 "status": "ok",
                 "snippet": evt.text.strip(),
+                "full_context": active_orchestrator.llm.get_context_summary(),
                 "is_final": evt.is_final
             })
 
@@ -105,7 +106,6 @@ def create_app(
         nonlocal loop
         loop = asyncio.get_running_loop()
         await manager.connect(websocket)
-        await active_stt.start()
         try:
             await websocket.send_json(
                 WebSocketEnvelope(event="system_status", data={"status": "connected", "mode": settings.dev_mode}).model_dump()
@@ -116,6 +116,12 @@ def create_app(
 
                 if action == "ping":
                     await websocket.send_json({"event": "pong"})
+
+                elif action == "start_audio":
+                    await active_stt.start()
+
+                elif action == "stop_audio":
+                    await active_stt.stop()
 
                 elif action == "audio_chunk":
                     chunk_b64 = data.get("data", "")

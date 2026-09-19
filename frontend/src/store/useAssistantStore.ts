@@ -8,7 +8,9 @@ interface AssistantState {
   stagedMessage: string;
   isRefining: boolean;
   history: DispatchedMessage[];
+  meetingContext: string;
   setMode: (mode: AppMode) => void;
+  setMeetingContext: (ctx: string) => void;
   stageEvent: (event: CommunicationEvent, normalizedText: string, isRefining?: boolean) => void;
   refineStagedMessage: (refinedText: string) => void;
   confirmStagedMessage: () => void;
@@ -22,7 +24,9 @@ export const useAssistantStore = create<AssistantState>((set, get) => ({
   stagedMessage: '',
   isRefining: false,
   history: [],
+  meetingContext: 'Discussing whether to migrate our database to PostgreSQL or keep MongoDB.',
   setMode: (mode) => set({ mode }),
+  setMeetingContext: (ctx) => set({ meetingContext: ctx }),
   stageEvent: (event, normalizedText, isRefining = true) => set({
     activeEvent: event,
     stagedMessage: normalizedText,

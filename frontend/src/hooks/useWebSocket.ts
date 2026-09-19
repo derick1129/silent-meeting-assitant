@@ -32,6 +32,11 @@ export function useWebSocket(url: string = 'ws://127.0.0.1:8000/ws/events') {
           } else if (envelope.event === 'message_refined') {
             const { refined_text } = envelope.data;
             useAssistantStore.getState().refineStagedMessage(refined_text);
+          } else if (envelope.event === 'context_updated') {
+            const fullContext = envelope.data?.full_context || envelope.data?.snippet;
+            if (fullContext) {
+              useAssistantStore.getState().setMeetingContext(fullContext);
+            }
           }
         } catch (err) {
           console.error('Failed to parse WebSocket message:', err);
@@ -88,6 +93,14 @@ export function useWebSocket(url: string = 'ws://127.0.0.1:8000/ws/events') {
     sendAction('audio_chunk', { data: base64Data });
   }, [sendAction]);
 
+  const startAudio = useCallback(() => {
+    sendAction('start_audio');
+  }, [sendAction]);
+
+  const stopAudio = useCallback(() => {
+    sendAction('stop_audio');
+  }, [sendAction]);
+
   return {
     isConnected,
     sendAction,
@@ -96,5 +109,7 @@ export function useWebSocket(url: string = 'ws://127.0.0.1:8000/ws/events') {
     detectGesture,
     detectLip,
     sendAudioChunk,
+    startAudio,
+    stopAudio,
   };
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { convertFloat32ToInt16, arrayBufferToBase64 } from '../useAudioStreamer';
+import { convertFloat32ToInt16, arrayBufferToBase64, downsampleBuffer } from '../useAudioStreamer';
 
 describe('useAudioStreamer PCM Audio Conversion', () => {
   it('converts Float32 audio samples (-1.0 to 1.0) to Int16 linear PCM correctly', () => {
@@ -19,6 +19,21 @@ describe('useAudioStreamer PCM Audio Conversion', () => {
 
     expect(int16Samples[0]).toBe(32767);
     expect(int16Samples[1]).toBe(-32767);
+  });
+
+  it('downsamples from 48000 Hz to 16000 Hz correctly (3:1 ratio)', () => {
+    // 6 samples at 48kHz downsample to 2 samples at 16kHz
+    const input48k = new Float32Array([0.2, 0.4, 0.6, 0.8, 1.0, 0.6]);
+    const output16k = downsampleBuffer(input48k, 48000, 16000);
+    expect(output16k.length).toBe(2);
+    expect(output16k[0]).toBeCloseTo((0.2 + 0.4 + 0.6) / 3, 2);
+    expect(output16k[1]).toBeCloseTo((0.8 + 1.0 + 0.6) / 3, 2);
+  });
+
+  it('passes through unchanged if input rate is already 16000 Hz', () => {
+    const input16k = new Float32Array([0.1, 0.2, 0.3]);
+    const output16k = downsampleBuffer(input16k, 16000, 16000);
+    expect(output16k).toBe(input16k);
   });
 
   it('converts ArrayBuffer to Base64 cleanly', () => {

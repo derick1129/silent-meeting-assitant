@@ -9,6 +9,34 @@ export function convertFloat32ToInt16(buffer: Float32Array): Int16Array {
   return buf;
 }
 
+export function downsampleBuffer(
+  buffer: Float32Array,
+  inputSampleRate: number,
+  outputSampleRate: number = 16000
+): Float32Array {
+  if (inputSampleRate === outputSampleRate) {
+    return buffer;
+  }
+  const ratio = inputSampleRate / outputSampleRate;
+  const newLength = Math.round(buffer.length / ratio);
+  const result = new Float32Array(newLength);
+  let offsetResult = 0;
+  let offsetBuffer = 0;
+  while (offsetResult < result.length) {
+    const nextOffsetBuffer = Math.round((offsetResult + 1) * ratio);
+    let accum = 0;
+    let count = 0;
+    for (let i = offsetBuffer; i < nextOffsetBuffer && i < buffer.length; i++) {
+      accum += buffer[i];
+      count++;
+    }
+    result[offsetResult] = count > 0 ? accum / count : 0;
+    offsetResult++;
+    offsetBuffer = nextOffsetBuffer;
+  }
+  return result;
+}
+
 export function arrayBufferToBase64(buffer: ArrayBuffer | ArrayBufferLike): string {
   let binary = '';
   const bytes = new Uint8Array(buffer);
@@ -57,7 +85,9 @@ export function useAudioStreamer(onChunk: (base64Chunk: string) => void) {
 
       processor.onaudioprocess = (e) => {
         const inputData = e.inputBuffer.getChannelData(0);
-        const pcm16 = convertFloat32ToInt16(inputData);
+        const currentRate = audioCtx.sampleRate || 16000;
+        const resampled = downsampleBuffer(inputData, currentRate, 16000);
+        const pcm16 = convertFloat32ToInt16(resampled);
         const b64 = arrayBufferToBase64(pcm16.buffer);
         onChunk(b64);
       };

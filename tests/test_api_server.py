@@ -96,14 +96,17 @@ def test_websocket_audio_chunk():
         assert initial["event"] == "system_status"
 
         fake_audio_b64 = base64.b64encode(b"\x00\x00" * 800).decode("utf-8")
+        websocket.send_json({"action": "start_audio"})
         websocket.send_json({
             "action": "audio_chunk",
             "data": fake_audio_b64
         })
+        websocket.send_json({"action": "stop_audio"})
 
         # Verify connection stays healthy
         websocket.send_json({"action": "ping"})
         pong = websocket.receive_json()
         assert pong["event"] == "pong"
+
 
 

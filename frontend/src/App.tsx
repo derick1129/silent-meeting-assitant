@@ -10,7 +10,16 @@ import { ShieldCheck } from 'lucide-react';
 
 export const App: React.FC = () => {
   const { history } = useAssistantStore();
-  const { isConnected, simulateIntent, updateContext, detectGesture, detectLip, sendAudioChunk } = useWebSocket();
+  const {
+    isConnected,
+    simulateIntent,
+    updateContext,
+    detectGesture,
+    detectLip,
+    sendAudioChunk,
+    startAudio,
+    stopAudio,
+  } = useWebSocket();
 
   const handleGestureDetected = React.useCallback(
     (_intent: string, landmarks: any[]) => {
@@ -39,6 +48,8 @@ export const App: React.FC = () => {
         <ContextDrawer
           onUpdateContext={updateContext}
           onSendAudioChunk={sendAudioChunk}
+          onStartAudio={startAudio}
+          onStopAudio={stopAudio}
           isConnected={isConnected}
         />
         
