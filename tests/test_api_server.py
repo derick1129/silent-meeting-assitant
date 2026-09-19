@@ -18,6 +18,43 @@ def test_commands_list():
     assert "YES" in commands
     assert "STOP" in commands
 
+def test_command_update_and_reset():
+    app = create_app()
+    client = TestClient(app)
+    
+    # 1. Update existing command
+    resp = client.post("/api/commands", json={
+        "intent": "YES",
+        "default_text": "LGTM! Approved."
+    })
+    assert resp.status_code == 200
+    assert resp.json()["command"]["default_text"] == "LGTM! Approved."
+    
+    # Verify GET reflects update
+    get_resp = client.get("/api/commands")
+    assert get_resp.json()["YES"]["default_text"] == "LGTM! Approved."
+
+    # 2. Add brand-new command
+    add_resp = client.post("/api/commands", json={
+        "intent": "WRAP_UP",
+        "display_name": "Wrap Up",
+        "default_text": "Let's wrap up the meeting.",
+        "supported_modalities": ["gesture", "lip"]
+    })
+    assert add_resp.status_code == 200
+    assert add_resp.json()["command"]["intent"] == "WRAP_UP"
+
+    get_resp2 = client.get("/api/commands")
+    assert "WRAP_UP" in get_resp2.json()
+    assert get_resp2.json()["WRAP_UP"]["default_text"] == "Let's wrap up the meeting."
+
+    # 3. Reset to defaults
+    reset_resp = client.post("/api/commands/reset")
+    assert reset_resp.status_code == 200
+    assert reset_resp.json()["commands"]["YES"]["default_text"] == "Yes, I agree."
+    assert "WRAP_UP" not in reset_resp.json()["commands"]
+
+
 def test_websocket_connection():
     app = create_app()
     client = TestClient(app)

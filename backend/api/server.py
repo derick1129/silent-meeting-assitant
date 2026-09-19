@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Set, Optional, Dict, Any
 import asyncio
 from backend.config import get_settings
-from backend.models.commands import COMMAND_REGISTRY
+from backend.models.commands import COMMAND_REGISTRY, CommandUpdateRequest, update_command, reset_commands_to_default
 from backend.models.events import WebSocketEnvelope, ModalitySource
 from backend.orchestrator import AssistantOrchestrator
 
@@ -84,6 +84,21 @@ def create_app(
     @app.get("/api/commands")
     def list_commands():
         return {k: v.model_dump() for k, v in COMMAND_REGISTRY.items()}
+
+    @app.post("/api/commands")
+    def update_command_endpoint(req: CommandUpdateRequest):
+        cmd = update_command(
+            intent=req.intent,
+            default_text=req.default_text,
+            display_name=req.display_name,
+            supported_modalities=req.supported_modalities,
+        )
+        return {"status": "ok", "command": cmd.model_dump()}
+
+    @app.post("/api/commands/reset")
+    def reset_commands_endpoint():
+        reset_commands_to_default()
+        return {"status": "ok", "commands": {k: v.model_dump() for k, v in COMMAND_REGISTRY.items()}}
 
     @app.websocket("/ws/events")
     async def websocket_endpoint(websocket: WebSocket):
