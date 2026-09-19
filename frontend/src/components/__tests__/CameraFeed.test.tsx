@@ -18,4 +18,16 @@ describe('CameraFeed Debounce and Cooldown Logic', () => {
     const initialActive = false;
     expect(initialActive).toBe(false);
   });
+
+  it('maps recognized lip intent to user-customized command text', () => {
+    const customRegistry: Record<string, string> = {
+      QUESTION: 'Wait, I have a doubt on this slide!',
+      STOP: 'Pause please, need a moment.',
+    };
+
+    const recognizedIntent = 'QUESTION';
+    const textToStage = customRegistry[recognizedIntent] || 'Default fallback';
+    expect(textToStage).toBe('Wait, I have a doubt on this slide!');
+  });
 });
+

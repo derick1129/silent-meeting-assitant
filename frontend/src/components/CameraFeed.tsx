@@ -1,11 +1,13 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Camera, CameraOff, ChevronDown, ChevronUp, Eye } from 'lucide-react';
+import { Camera, CameraOff, ChevronDown, ChevronUp, Eye, MessageSquare } from 'lucide-react';
 import { Hands, Results } from '@mediapipe/hands';
 import { FaceMesh, Results as FaceMeshResults } from '@mediapipe/face_mesh';
 import { Camera as MediaPipeCamera } from '@mediapipe/camera_utils';
 import { classifyHandLandmarks } from '../utils/gestureClassifier';
 import { extractLipPoints } from '../utils/lipExtractor';
+import { LipKinematicsTracker } from '../utils/lipClassifier';
 import { useAssistantStore } from '../store/useAssistantStore';
+import { useCommandStore } from '../store/useCommandStore';
 
 interface CameraFeedProps {
   onGestureDetected: (intent: string, landmarks: any[]) => void;
@@ -16,6 +18,9 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ onGestureDetected, onLip
   const [isActive, setIsActive] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [detectedGesture, setDetectedGesture] = useState<string | null>(null);
+  const [detectedLipIntent, setDetectedLipIntent] = useState<string | null>(null);
+  const [lipState, setLipState] = useState<string>('NEUTRAL');
+  const [lipLAR, setLipLAR] = useState<number>(0);
   const [permissionError, setPermissionError] = useState<string | null>(null);
 
   const [isInitializing, setIsInitializing] = useState(false);
@@ -25,6 +30,7 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ onGestureDetected, onLip
   const cameraInstanceRef = useRef<MediaPipeCamera | null>(null);
   const handsInstanceRef = useRef<Hands | null>(null);
   const faceMeshInstanceRef = useRef<FaceMesh | null>(null);
+  const lipTrackerRef = useRef<LipKinematicsTracker>(new LipKinematicsTracker(24, 2000));
   const lastEmittedRef = useRef<number>(0);
 
   const { stageEvent } = useAssistantStore();
@@ -39,12 +45,46 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ onGestureDetected, onLip
       const face = results.multiFaceLandmarks[0];
       const lipPoints = extractLipPoints(face as any);
       if (lipPoints && lipPoints.length === 40) {
-        // Draw 40 lip landmarks in vibrant emerald
+        const lipResult = lipTrackerRef.current.processFrame(lipPoints);
+
+        let lipColor = '#10b981'; // emerald for neutral
+        if (lipResult) {
+          setLipState(lipResult.state);
+          setLipLAR(lipResult.lar);
+          if (lipResult.state === 'OPENING') lipColor = '#f59e0b';
+          else if (lipResult.state === 'SUSTAINED_OPEN') lipColor = '#ef4444';
+          else if (lipResult.state === 'PURSED') lipColor = '#06b6d4';
+
+          if (lipResult.intent) {
+            setDetectedLipIntent(lipResult.intent);
+            const now = Date.now();
+            const customText = useCommandStore.getState().getCommandText(lipResult.intent);
+
+            // 1. Immediate local stage (0ms latency)
+            stageEvent(
+              {
+                id: `evt_lip_${now}`,
+                source: 'lip',
+                intent: lipResult.intent,
+                raw_text: customText,
+                confidence: lipResult.confidence,
+              },
+              customText,
+              true // Refinement underway
+            );
+
+            setTimeout(() => setDetectedLipIntent(null), 2500);
+          }
+        }
+
+        // Draw 40 lip landmarks with dynamic state color
         ctx.save();
-        ctx.fillStyle = '#10b981';
+        ctx.fillStyle = lipColor;
+        ctx.shadowColor = lipColor;
+        ctx.shadowBlur = lipResult && lipResult.state !== 'NEUTRAL' ? 6 : 0;
         for (const pt of lipPoints) {
           ctx.beginPath();
-          ctx.arc(pt.x * canvas.width, pt.y * canvas.height, 2, 0, 2 * Math.PI);
+          ctx.arc(pt.x * canvas.width, pt.y * canvas.height, 2.5, 0, 2 * Math.PI);
           ctx.fill();
         }
         ctx.restore();
@@ -54,10 +94,9 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ onGestureDetected, onLip
         }
       }
     }
-  }, [onLipDetected]);
+  }, [stageEvent, onLipDetected]);
 
   const handleResults = useCallback((results: Results) => {
-    console.log('[CameraFeed] handleResults called! Hands detected:', results.multiHandLandmarks?.length || 0);
     setIsInitializing(false);
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -91,16 +130,18 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ onGestureDetected, onLip
         if (now - lastEmittedRef.current > 1500) {
           lastEmittedRef.current = now;
 
-          // 1. Immediate local stage (0ms latency)
+          const customText = useCommandStore.getState().getCommandText(classified.intent) || classified.defaultText;
+
+          // 1. Immediate local stage (0ms latency) with user-customized text
           stageEvent(
             {
               id: `evt_${now}`,
               source: 'gesture',
               intent: classified.intent,
-              raw_text: classified.defaultText,
+              raw_text: customText,
               confidence: classified.confidence,
             },
-            classified.defaultText,
+            customText,
             true // Refinement underway
           );
 
@@ -284,6 +325,31 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ onGestureDetected, onLip
               <span className="font-semibold">{detectedGesture}</span>
             </div>
           )}
+
+          {detectedLipIntent && (
+            <div className="absolute top-2 right-2 z-20 bg-amber-950/90 border border-amber-400 text-amber-100 text-[11px] font-mono px-2.5 py-1 rounded-full shadow-lg flex items-center gap-1.5 animate-pulse">
+              <MessageSquare className="w-3.5 h-3.5 text-amber-300" />
+              <span className="font-semibold">{detectedLipIntent}</span>
+            </div>
+          )}
+
+          {/* Real-time Kinematic HUD status */}
+          <div className="absolute bottom-2 left-2 z-20 bg-gray-950/80 backdrop-blur-sm border border-gray-800 text-[10px] font-mono px-2 py-0.5 rounded text-gray-400 flex items-center gap-1.5">
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${
+                lipState === 'OPENING'
+                  ? 'bg-amber-400 animate-ping'
+                  : lipState === 'SUSTAINED_OPEN'
+                  ? 'bg-rose-500 animate-ping'
+                  : lipState === 'PURSED'
+                  ? 'bg-cyan-400'
+                  : 'bg-emerald-400'
+              }`}
+            />
+            <span>LAR: {lipLAR.toFixed(2)}</span>
+            <span className="text-gray-500">|</span>
+            <span className="uppercase text-[9px] text-gray-300">{lipState}</span>
+          </div>
         </div>
       )}
     </div>
