@@ -16,3 +16,11 @@ export interface DispatchedMessage {
   message: string;
   timestamp: number;
 }
+
+export interface CommandDefinition {
+  intent: string;
+  display_name: string;
+  default_text: string;
+  supported_modalities: string[];
+}
+
