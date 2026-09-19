@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Camera, CameraOff, ChevronDown, ChevronUp, Eye } from 'lucide-react';
 import { Hands, Results } from '@mediapipe/hands';
+import { FaceMesh, Results as FaceMeshResults } from '@mediapipe/face_mesh';
 import { Camera as MediaPipeCamera } from '@mediapipe/camera_utils';
 import { classifyHandLandmarks } from '../utils/gestureClassifier';
+import { extractLipPoints } from '../utils/lipExtractor';
 import { useAssistantStore } from '../store/useAssistantStore';
 
 interface CameraFeedProps {
@@ -10,7 +12,7 @@ interface CameraFeedProps {
   onLipDetected?: (landmarks: any[]) => void;
 }
 
-export const CameraFeed: React.FC<CameraFeedProps> = ({ onGestureDetected, onLipDetected: _onLipDetected }) => {
+export const CameraFeed: React.FC<CameraFeedProps> = ({ onGestureDetected, onLipDetected }) => {
   const [isActive, setIsActive] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [detectedGesture, setDetectedGesture] = useState<string | null>(null);
@@ -22,9 +24,37 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ onGestureDetected, onLip
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const cameraInstanceRef = useRef<MediaPipeCamera | null>(null);
   const handsInstanceRef = useRef<Hands | null>(null);
+  const faceMeshInstanceRef = useRef<FaceMesh | null>(null);
   const lastEmittedRef = useRef<number>(0);
 
   const { stageEvent } = useAssistantStore();
+
+  const handleFaceMeshResults = useCallback((results: FaceMeshResults) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+      const face = results.multiFaceLandmarks[0];
+      const lipPoints = extractLipPoints(face as any);
+      if (lipPoints && lipPoints.length === 40) {
+        // Draw 40 lip landmarks in vibrant emerald
+        ctx.save();
+        ctx.fillStyle = '#10b981';
+        for (const pt of lipPoints) {
+          ctx.beginPath();
+          ctx.arc(pt.x * canvas.width, pt.y * canvas.height, 2, 0, 2 * Math.PI);
+          ctx.fill();
+        }
+        ctx.restore();
+
+        if (onLipDetected) {
+          onLipDetected(lipPoints);
+        }
+      }
+    }
+  }, [onLipDetected]);
 
   const handleResults = useCallback((results: Results) => {
     console.log('[CameraFeed] handleResults called! Hands detected:', results.multiHandLandmarks?.length || 0);
@@ -89,17 +119,13 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ onGestureDetected, onLip
   useEffect(() => {
     if (!isActive || !videoRef.current) return;
 
-    console.log('[CameraFeed] Initializing camera & MediaPipe Hands...');
+    console.log('[CameraFeed] Initializing camera, MediaPipe Hands & FaceMesh...');
     setPermissionError(null);
     setIsInitializing(true);
 
     try {
       const hands = new Hands({
-        locateFile: (file) => {
-          const path = `/mediapipe/hands/${file}`;
-          console.log('[CameraFeed] locateFile requested:', file, '->', path);
-          return path;
-        },
+        locateFile: (file) => `/mediapipe/hands/${file}`,
       });
 
       hands.setOptions({
@@ -112,17 +138,36 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ onGestureDetected, onLip
       hands.onResults(handleResults);
       handsInstanceRef.current = hands;
 
-      let frameCount = 0;
+      const faceMesh = new FaceMesh({
+        locateFile: (file) => `/mediapipe/face_mesh/${file}`,
+      });
+
+      faceMesh.setOptions({
+        maxNumFaces: 1,
+        refineLandmarks: false,
+        minDetectionConfidence: 0.50,
+        minTrackingConfidence: 0.50,
+      });
+
+      faceMesh.onResults(handleFaceMeshResults);
+      faceMeshInstanceRef.current = faceMesh;
+
       const camera = new MediaPipeCamera(videoRef.current, {
         onFrame: async () => {
-          if (videoRef.current && handsInstanceRef.current) {
-            if (frameCount++ % 30 === 0) {
-              console.log('[CameraFeed] onFrame tick', frameCount, 'video readyState:', videoRef.current.readyState, 'size:', videoRef.current.videoWidth, 'x', videoRef.current.videoHeight);
+          if (videoRef.current) {
+            if (handsInstanceRef.current) {
+              try {
+                await handsInstanceRef.current.send({ image: videoRef.current });
+              } catch (frameErr) {
+                console.error('[CameraFeed] Error in hands.send:', frameErr);
+              }
             }
-            try {
-              await handsInstanceRef.current.send({ image: videoRef.current });
-            } catch (frameErr) {
-              console.error('[CameraFeed] Error in hands.send:', frameErr);
+            if (faceMeshInstanceRef.current) {
+              try {
+                await faceMeshInstanceRef.current.send({ image: videoRef.current });
+              } catch (faceErr) {
+                console.error('[CameraFeed] Error in faceMesh.send:', faceErr);
+              }
             }
           }
         },
@@ -142,7 +187,7 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ onGestureDetected, onLip
 
       cameraInstanceRef.current = camera;
     } catch (e: any) {
-      console.error('[CameraFeed] Failed to initialize MediaPipe Hands:', e);
+      console.error('[CameraFeed] Failed to initialize MediaPipe:', e);
       setPermissionError(e.message || 'MediaPipe initialization error');
       setIsActive(false);
       setIsInitializing(false);
@@ -157,9 +202,13 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ onGestureDetected, onLip
         handsInstanceRef.current.close();
         handsInstanceRef.current = null;
       }
+      if (faceMeshInstanceRef.current) {
+        faceMeshInstanceRef.current.close();
+        faceMeshInstanceRef.current = null;
+      }
       setIsInitializing(false);
     };
-  }, [isActive, handleResults]);
+  }, [isActive, handleResults, handleFaceMeshResults]);
 
   const toggleCamera = () => {
     setIsActive((prev) => !prev);
@@ -185,7 +234,7 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ onGestureDetected, onLip
           {isActive && (
             <span className="flex items-center gap-1 text-[11px] text-emerald-400 font-mono">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              Tracking Hands
+              Tracking Hands & Lips
             </span>
           )}
         </div>
