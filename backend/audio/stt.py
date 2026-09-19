@@ -58,6 +58,37 @@ class DeepgramSTTProvider(BaseSTTProvider):
         self._pending_chunks = deque(maxlen=60)  # Pre-buffers up to ~3 seconds during handshake
         self._lock = threading.Lock()
 
+    def _process_socket_message(self, message) -> None:
+        channel = getattr(message, "channel", None) or (message.get("channel") if isinstance(message, dict) else None)
+        if channel is None:
+            return
+
+        alts = []
+        if isinstance(channel, list):
+            for ch in channel:
+                ch_alts = getattr(ch, "alternatives", None) or (ch.get("alternatives") if isinstance(ch, dict) else None) or []
+                alts.extend(ch_alts)
+        else:
+            alts = getattr(channel, "alternatives", None) or (channel.get("alternatives") if isinstance(channel, dict) else None) or []
+
+        is_final = getattr(message, "is_final", None)
+        if is_final is None and isinstance(message, dict):
+            is_final = message.get("is_final", True)
+        if is_final is None:
+            is_final = True
+
+        for alt in alts:
+            transcript = getattr(alt, "transcript", None) or (alt.get("transcript") if isinstance(alt, dict) else "")
+            if transcript and transcript.strip():
+                confidence = getattr(alt, "confidence", None) or (alt.get("confidence") if isinstance(alt, dict) else 0.95) or 0.95
+                event = STTTranscriptEvent(
+                    text=transcript.strip(),
+                    is_final=bool(is_final),
+                    confidence=float(confidence)
+                )
+                if self.on_transcript:
+                    self.on_transcript(event)
+
     async def start(self) -> None:
         if not self.api_key or self.api_key == "mock_key":
             self.is_connected = False
@@ -78,7 +109,10 @@ class DeepgramSTTProvider(BaseSTTProvider):
                         model="nova-2",
                         smart_format=True,
                         encoding="linear16",
-                        sample_rate=16000
+                        sample_rate=16000,
+                        interim_results=True,
+                        endpointing=300,
+                        utterance_end_ms=1000,
                     ) as socket:
                         with self._lock:
                             self._socket = socket
@@ -95,17 +129,7 @@ class DeepgramSTTProvider(BaseSTTProvider):
                         for message in socket:
                             if not self._running:
                                 break
-                            if hasattr(message, "channel") and message.channel.alternatives:
-                                for alt in message.channel.alternatives:
-                                    if alt.transcript and alt.transcript.strip():
-                                        is_final = getattr(message, "is_final", True)
-                                        event = STTTranscriptEvent(
-                                            text=alt.transcript.strip(),
-                                            is_final=is_final,
-                                            confidence=getattr(alt, "confidence", 0.95)
-                                        )
-                                        if self.on_transcript:
-                                            self.on_transcript(event)
+                            self._process_socket_message(message)
                 except Exception as exc:
                     logger.warning(f"[DeepgramSTT] Socket closed or error: {exc}")
                 finally:
